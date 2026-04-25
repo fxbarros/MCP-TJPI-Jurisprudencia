@@ -44,23 +44,23 @@ Sem login, sem Cloudflare, sem browser headless. O TJ-PI é um site Rails públi
 ## Instalação
 
 ```bash
-git clone https://github.com/SEU-USUARIO/jurisprudencia-tjpi-mcp.git
+git clone https://github.com/fxbarros/MCP-TJPI-Jurisprudencia.git jurisprudencia-tjpi-mcp
 cd jurisprudencia-tjpi-mcp
 uv sync
 ```
 
 ## Configuração no Claude Desktop
 
-Abra `~/Library/Application Support/Claude/claude_desktop_config.json` e adicione (preservando outros servidores se houver):
+Abra `~/Library/Application Support/Claude/claude_desktop_config.json` e adicione o servidor (preservando outros que já existirem):
 
 ```json
 {
   "mcpServers": {
     "jurisprudencia-tjpi": {
-      "command": "/Users/SEU_USUARIO/.local/bin/uv",
+      "command": "/Users/SEU_USUARIO_MAC/.local/bin/uv",
       "args": [
         "--directory",
-        "/Users/SEU_USUARIO/Desenvolvimento/jurisprudencia-tjpi-mcp",
+        "/Users/SEU_USUARIO_MAC/Desenvolvimento/jurisprudencia-tjpi-mcp",
         "run",
         "jurisprudencia-tjpi-mcp"
       ]
@@ -69,7 +69,9 @@ Abra `~/Library/Application Support/Claude/claude_desktop_config.json` e adicion
 }
 ```
 
-> ⚠️ Use o caminho **absoluto** do `uv` (descubra com `which uv`) — o Claude Desktop não herda o `$PATH` do shell.
+> ⚠️ **Substitua `SEU_USUARIO_MAC` pelo nome do seu usuário no macOS** (descubra rodando `whoami` no Terminal). Esse placeholder é da máquina de quem está instalando, não tem nada a ver com seu username do GitHub.
+>
+> ⚠️ Use também o caminho **absoluto** do `uv` (confirme com `which uv` — pode ser `/opt/homebrew/bin/uv` em vez de `/Users/.../.local/bin/uv` dependendo da instalação). O Claude Desktop não herda o `$PATH` do shell.
 
 Reinicie o Claude Desktop (Cmd+Q e abra novamente). Em uma conversa nova, peça por exemplo: _"Busque jurisprudência do TJ-PI sobre dano moral por negativação indevida"_.
 
@@ -113,4 +115,4 @@ MIT — veja [LICENSE](LICENSE).
 
 ## Autoria
 
-Construído por [Fábio Ximenes Barros](https://github.com/SEU-USUARIO). Não tem afiliação com o TJ-PI; usa apenas o portal público de jurisprudência.
+Construído por [Fábio Ximenes Barros](https://github.com/fxbarros) (OAB/PI 22190), Procurador do Município de Teresina, com auxílio do Claude. Não tem afiliação com o TJ-PI; usa apenas o portal público de jurisprudência.
