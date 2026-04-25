@@ -106,6 +106,39 @@ async def ler_decisao(url_or_id: str) -> dict:
     out["citacao_abnt"] = d.citacao_abnt()
     return out
 
+@mcp.tool()
+async def verificar_citacao(url_or_id: str, trecho: str) -> dict:
+    """Confere se um trecho aparece literalmente no inteiro_teor de uma decisão.
+
+    ⚠️ USE SEMPRE antes de incluir uma citação direta entre aspas em peças
+    processuais ou respostas finais. Se o resultado for `valido: False`,
+    NÃO cite o trecho — reescreva como paráfrase ou abra a decisão.
+
+    A comparação é tolerante a:
+    - Diferenças de acentuação (ex: "decisao" casa com "decisão")
+    - Diferenças de caixa (maiúscula/minúscula)
+    - Espaços múltiplos, quebras de linha
+
+    A comparação NÃO é tolerante a:
+    - Substituição de palavras (paráfrase reescrita)
+    - Omissão de palavras no meio do trecho
+    - Inversão de ordem das palavras
+
+    Args:
+        url_or_id: URL completa, caminho ou ID numérico da decisão (mesmo
+                   formato aceito por `ler_decisao`).
+        trecho: o texto que se pretende citar entre aspas. Pode ter de
+                3 palavras a vários parágrafos.
+
+    Returns:
+        Dict com:
+        - valido (bool): True se o trecho foi encontrado no inteiro_teor.
+        - motivo (str): explicação textual do resultado.
+        - url (str | None): URL canônica da decisão verificada.
+    """
+    client = await _get_client()
+    return await client.verificar_citacao(url_or_id, trecho)
+
 
 def main() -> None:
     """Entry point pro `uv run jurisprudencia-tjpi-mcp`."""
