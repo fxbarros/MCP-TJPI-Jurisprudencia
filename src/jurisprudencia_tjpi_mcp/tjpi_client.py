@@ -189,6 +189,19 @@ def _norm_label(s: str) -> str:
     s = "".join(c for c in s if not unicodedata.combining(c))
     return s.lower().strip().rstrip(":")
 
+def _normalize_para_comparacao(s: str) -> str:
+    """Normaliza texto para comparação tolerante: sem acentos, lowercase,
+    espacos multiplos colapsados. Usada por verificar_citacao para que
+    diferencas triviais (acentuacao, quebras de linha, multiplos espacos)
+    nao causem falsos negativos.
+    """
+    if not s:
+        return ""
+    s = unicodedata.normalize("NFKD", s)
+    s = "".join(c for c in s if not unicodedata.combining(c))
+    s = re.sub(r"\s+", " ", s)
+    return s.strip().lower()
+
 
 def _parse_resultados(html: str, base_url: str = BASE_URL,
                       limite: Optional[int] = None) -> list[Resultado]:
@@ -336,3 +349,38 @@ class TJPIClient:
         r = await self._client.get(url)
         r.raise_for_status()
         return _parse_decisao(r.text, url)
+    
+    async def verificar_citacao(self, url_or_id: str, trecho: str) -> dict:
+        """Confere se `trecho` aparece literalmente no inteiro_teor da decisao
+        identificada por `url_or_id`. Comparacao tolerante a acentos, caixa
+        e espacos multiplos. Usar antes de citar trechos entre aspas em pecas.
+        """
+        if not trecho or not trecho.strip():
+            return {
+                "valido": False,
+                "motivo": "trecho vazio",
+                "url": None,
+            }
+        decisao = await self.ler_decisao(url_or_id)
+        if not decisao.inteiro_teor:
+            return {
+                "valido": False,
+                "motivo": "inteiro_teor vazio ou nao extraido",
+                "url": decisao.url,
+            }
+        teor_norm = _normalize_para_comparacao(decisao.inteiro_teor)
+        trecho_norm = _normalize_para_comparacao(trecho)
+        if trecho_norm in teor_norm:
+            return {
+                "valido": True,
+                "motivo": "trecho encontrado no inteiro_teor",
+                "url": decisao.url,
+            }
+        return {
+            "valido": False,
+            "motivo": (
+                "trecho NAO encontrado no inteiro_teor. NAO cite entre aspas. "
+                "Reescreva como parafrase ou abra a decisao manualmente."
+            ),
+            "url": decisao.url,
+        }
