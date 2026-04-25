@@ -36,6 +36,17 @@ async def buscar_jurisprudencia(
 ) -> list[dict]:
     """Pesquisa jurisprudência do TJ-PI por palavra-chave.
 
+    ⚠️ IMPORTANTE — ANTI-ALUCINAÇÃO:
+    O campo `ementa` retornado é apenas um PREVIEW da listagem do servidor
+    e pode estar TRUNCADO. NUNCA cite trechos do campo `ementa` desta tool
+    em peças processuais, nem afirme que uma decisão "diz X" baseado apenas
+    nesta resposta. Para qualquer afirmação sobre o conteúdo da decisão,
+    chame `ler_decisao(url)` e use o campo `inteiro_teor`.
+
+    Quando o servidor trunca antes da seção "Ementa:", o resultado virá com
+    `ementa_truncada=true` e um campo `_aviso` explicando o problema. Nesses
+    casos é OBRIGATÓRIO chamar `ler_decisao(url)` antes de qualquer citação.
+
     Site oficial: https://jurisprudencia.tjpi.jus.br/
     Suporta conectivos (E, OU, NÃO, ASPAS para frase exata).
 
@@ -47,8 +58,8 @@ async def buscar_jurisprudencia(
 
     Returns:
         Lista de dicts com: titulo, numero_cnj, tipo_decisao, assunto,
-        publicacao, ementa (preview), url. Use a `url` em `ler_decisao`
-        para obter metadados formais completos.
+        publicacao, ementa (PREVIEW — pode estar truncado), ementa_truncada,
+        url. Use `url` em `ler_decisao` antes de citar a decisão.
     """
     limite = max(1, min(limite, 50))
     client = await _get_client()
@@ -62,7 +73,17 @@ async def buscar_jurisprudencia(
 async def ler_decisao(url_or_id: str) -> dict:
     """Lê uma decisão individual do TJ-PI e extrai todos os metadados formais.
 
-    Use APÓS `buscar_jurisprudencia` para montar citações em peças processuais.
+    Use SEMPRE esta tool antes de citar uma decisão em peça processual,
+    mesmo que `buscar_jurisprudencia` já tenha retornado uma `ementa`. O
+    preview da busca é insuficiente e pode ser apenas o cabeçalho do acórdão.
+
+    ⚠️ REGRAS DE CITAÇÃO:
+    - Para citações DIRETAS entre aspas, use APENAS texto presente no
+      `inteiro_teor`. Confira a presença literal antes de citar.
+    - Para teses, fundamentos ou trechos parafraseados, baseie-se no
+      `inteiro_teor`, não em conclusões inferidas da `ementa` da listagem.
+    - O campo `ementa` retornado por ESTA tool é confiável (extraído da
+      página de detalhe), diferente da `ementa` truncada da listagem.
 
     Args:
         url_or_id: URL completa (https://jurisprudencia.tjpi.jus.br/...),
@@ -75,7 +96,7 @@ async def ler_decisao(url_or_id: str) -> dict:
         - relator, orgao_julgador, orgao_julgador_colegiado, competencia
         - autor, reu, publicacao, assunto_principal
         - ementa (texto limpo, sem o cabeçalho do acórdão)
-        - inteiro_teor (texto completo da decisão)
+        - inteiro_teor (texto completo da decisão — fonte para citações)
         - citacao_oficial (string já formatada pelo próprio site)
         - citacao_abnt (montada por nós: "(TJ-PI - Classe: CNJ, Relator: X, ...)")
     """
