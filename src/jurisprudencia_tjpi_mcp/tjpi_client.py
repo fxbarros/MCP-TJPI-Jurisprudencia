@@ -39,10 +39,17 @@ class Resultado:
     publicacao: Optional[str]
     ementa: Optional[str]
     url: str
+    ementa_truncada: bool = False  # True quando o preview do servidor cortou antes de "Ementa:"
 
     def to_dict(self) -> dict:
-        return asdict(self)
-
+        d = asdict(self)
+        if self.ementa_truncada:
+            d["_aviso"] = (
+                "Ementa nao disponivel na listagem (preview do servidor truncado "
+                "antes da secao 'Ementa:'). Para obter a ementa real e o inteiro teor, "
+                "chame ler_decisao(url). NAO cite o conteudo deste campo em pecas."
+            )
+        return d
 
 @dataclass
 class Decisao:
