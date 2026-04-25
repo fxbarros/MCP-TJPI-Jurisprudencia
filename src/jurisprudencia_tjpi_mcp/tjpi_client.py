@@ -229,7 +229,21 @@ def _parse_resultados(html: str, base_url: str = BASE_URL,
 
         txt_div = a_tag.find_next("div", class_="text-justify")
         raw_text = _clean(txt_div.get_text()) if txt_div else None
-        ementa = _extract_ementa(raw_text) or raw_text
+
+        ementa_extraida = _extract_ementa(raw_text)
+        if ementa_extraida:
+            ementa = ementa_extraida
+            ementa_truncada = False
+        elif _eh_cabecalho_acordao(raw_text):
+            # Servidor truncou antes da secao "Ementa:" e raw_text e so cabecalho.
+            # Devolver None e mais honesto que entregar o cabecalho como ementa.
+            ementa = None
+            ementa_truncada = True
+        else:
+            # raw_text nao tem "Ementa:" mas tampouco e cabecalho tipico —
+            # mantem comportamento antigo (preview cru, sem flag de truncado).
+            ementa = raw_text
+            ementa_truncada = False
 
         resultados.append(Resultado(
             titulo=full_text,
@@ -239,8 +253,8 @@ def _parse_resultados(html: str, base_url: str = BASE_URL,
             publicacao=publicacao,
             ementa=ementa,
             url=url,
+            ementa_truncada=ementa_truncada,
         ))
-
         if limite and len(resultados) >= limite:
             break
 
