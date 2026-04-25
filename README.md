@@ -115,4 +115,4 @@ MIT — veja [LICENSE](LICENSE).
 
 ## Autoria
 
-Construído por [Fábio Ximenes Barros](https://github.com/fxbarros), com auxílio do Claude. Não tem afiliação com o TJ-PI; usa apenas o portal público de jurisprudência.
+Construído por [Fábio Ximenes Barros](https://github.com/fxbarros). Não tem afiliação com o TJ-PI; usa apenas o portal público de jurisprudência.
