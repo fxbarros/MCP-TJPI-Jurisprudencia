@@ -140,6 +140,35 @@ def _extract_ementa(text: Optional[str]) -> Optional[str]:
     return _clean(rest[:end])
 
 
+# Padrões usados pra detectar quando o preview da listagem é só o cabeçalho do
+# acórdão (sem chegar à seção "Ementa:"). Vide nota 06a-preview-trunca-listagem.
+_CABECALHO_RE = re.compile(
+    r"^\s*(?:"
+    r"poder\s+judici"
+    r"|tribunal\s+de\s+justi"
+    r"|gabinete\s+d[oa]"
+    r"|processo\s+n[º°\.:]"
+    r"|classe\s*[:\.]"
+    r"|apelante\s*[:\.]"
+    r"|apelado\s*[:\.]"
+    r")",
+    re.IGNORECASE,
+)
+
+
+def _eh_cabecalho_acordao(texto: Optional[str]) -> bool:
+    """Heurística: True quando `texto` parece ser apenas o cabeçalho do
+    acórdão (sem ementa). Usada no fallback de `_parse_resultados` para
+    decidir se é mais honesto retornar `ementa=None` em vez de devolver o
+    cabeçalho como se fosse ementa.
+    """
+    if not texto:
+        return False
+    # Se "ementa" aparece no texto, definitivamente não é só cabeçalho.
+    if "ementa" in texto.lower()[:1000]:
+        return False
+    return bool(_CABECALHO_RE.match(texto))
+
 _SIDEBAR_LABELS = {
     "processo": "numero_cnj",
     "relator(a)": "relator",
