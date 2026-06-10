@@ -8,7 +8,8 @@ import os
 import re
 import sys
 import unicodedata
-from dataclasses import asdict, dataclass
+from collections import OrderedDict
+from dataclasses import asdict, dataclass, field
 from typing import Optional
 from urllib.parse import urljoin
 
@@ -18,6 +19,9 @@ from bs4 import BeautifulSoup
 BASE_URL = "https://jurisprudencia.tjpi.jus.br"
 SEARCH_PATH = "/jurisprudences/search"
 DEBUG = os.environ.get("TJPI_DEBUG") == "1"
+
+# O servidor pagina de 25 em 25; usado pra detectar última página.
+PAGE_SIZE = 25
 
 DEFAULT_HEADERS = {
     "User-Agent": (
@@ -94,6 +98,18 @@ _DATA_RE = re.compile(r"\d{2}/\d{2}/\d{4}")
 # Regex para o INICIO da ementa
 _EMENTA_START_RE = re.compile(r"\bEmenta\s*[:\-–]\s*", re.I)
 
+# Formato CNJ (Recomendação 154/2024): decisões de 2025+ não têm o rótulo
+# "Ementa:" — a ementa estruturada começa direto com o ramo do direito em
+# caixa alta ("DIREITO CIVIL E PROCESSUAL CIVIL. APELAÇÃO CÍVEL. ...").
+# Só vale como âncora se for caixa alta (o assunto do cabeçalho traz
+# "Direito de Imagem" capitalizado, que não casa).
+_EMENTA_CNJ_START_RE = re.compile(r"\bDIREITO\s+[A-ZÁÂÃÀÉÊÍÓÔÕÚÜÇ]{2,}")
+
+# A âncora CNJ só é procurada no começo do texto: depois do cabeçalho
+# (gabinete/processo/classe/partes) e antes do corpo, onde "DIREITO X"
+# pode aparecer em citações.
+_EMENTA_CNJ_JANELA = 3000
+
 # Regex para o FIM da ementa (primeiro marcador encontrado)
 _EMENTA_END_RE = re.compile(
     r"\s+(?:"
@@ -117,27 +133,73 @@ def _clean(s: Optional[str]) -> Optional[str]:
     return out or None
 
 
+def _clean_multiline(s: Optional[str]) -> Optional[str]:
+    """Como _clean, mas preserva quebras de linha entre parágrafos:
+    colapsa espaços dentro de cada linha e descarta linhas vazias.
+    """
+    if s is None:
+        return None
+    linhas = (re.sub(r"[ \t\xa0]+", " ", ln).strip() for ln in s.splitlines())
+    out = "\n".join(ln for ln in linhas if ln)
+    return out or None
+
+
+_BLOCK_TAGS = ("p", "div", "li", "tr", "blockquote",
+               "h1", "h2", "h3", "h4", "h5", "h6")
+
+
+def _block_text(el) -> str:
+    """Extrai texto com \\n entre blocos (<p>, <div>, <br>...) e SEM separador
+    dentro de cada bloco. Os dois lados do trade-off documentado na nota
+    06b: get_text(" ") quebra palavras fragmentadas em tags inline
+    ("E menta"); get_text() puro cola fim de parágrafo no início do
+    seguinte ("CARDOSOAPELADO:"). Inserir \\n só nas fronteiras de bloco
+    resolve ambos. Atenção: muta a árvore do `el` (parsear por chamada).
+    """
+    for br in el.find_all("br"):
+        br.replace_with("\n")
+    for tag in el.find_all(_BLOCK_TAGS):
+        tag.insert_before("\n")
+        tag.append("\n")
+    return el.get_text()
+
+
 def _extract_ementa(text: Optional[str]) -> Optional[str]:
-    """Localiza 'Ementa:' e fatia até o próximo marcador de RELATORIO/VOTO/etc.
-    Sem lookahead/non-greedy — busca-por-índice, mais robusto que regex composto.
+    """Localiza o início da ementa e fatia até o próximo marcador de
+    RELATORIO/VOTO/etc. Sem lookahead/non-greedy — busca-por-índice.
+
+    Dois formatos reconhecidos:
+    1. Clássico: rótulo "Ementa:" (decisões até ~2024).
+    2. CNJ (Recomendação 154/2024, decisões 2025+): sem rótulo; a ementa
+       estruturada começa com o ramo do direito em caixa alta
+       ("DIREITO CIVIL E PROCESSUAL CIVIL. ...").
     """
     if not text:
         return None
     m = _EMENTA_START_RE.search(text)
-    if not m:
-        if DEBUG:
-            print("  [DEBUG] _extract_ementa: 'Ementa' nao encontrada", file=sys.stderr)
-        return None
-    rest = text[m.end():]
+    if m:
+        rest = text[m.end():]
+        formato = "classico"
+    else:
+        m_cnj = _EMENTA_CNJ_START_RE.search(text[:_EMENTA_CNJ_JANELA])
+        if not m_cnj:
+            if DEBUG:
+                print(
+                    "  [DEBUG] _extract_ementa: nem 'Ementa:' nem inicio CNJ "
+                    "encontrados", file=sys.stderr,
+                )
+            return None
+        rest = text[m_cnj.start():]
+        formato = "cnj"
     m_end = _EMENTA_END_RE.search(rest)
     end = m_end.start() if m_end else len(rest)
     if DEBUG:
         print(
-            f"  [DEBUG] _extract_ementa: text_len={len(text)} "
-            f"start={m.end()} end_offset={end} marker={'sim' if m_end else 'nao'}",
+            f"  [DEBUG] _extract_ementa: formato={formato} text_len={len(text)} "
+            f"end_offset={end} marker={'sim' if m_end else 'nao'}",
             file=sys.stderr,
         )
-    return _clean(rest[:end])
+    return _clean_multiline(rest[:end])
 
 
 # Padrões usados pra detectar quando o preview da listagem é só o cabeçalho do
@@ -241,7 +303,7 @@ def _parse_resultados(html: str, base_url: str = BASE_URL,
                 publicacao = m.group(0) if m else t.replace("Publicação:", "").strip()
 
         txt_div = a_tag.find_next("div", class_="text-justify")
-        raw_text = _clean(txt_div.get_text()) if txt_div else None
+        raw_text = _clean_multiline(_block_text(txt_div)) if txt_div else None
 
         ementa_extraida = _extract_ementa(raw_text)
         if ementa_extraida:
@@ -274,6 +336,41 @@ def _parse_resultados(html: str, base_url: str = BASE_URL,
     return resultados
 
 
+def _extract_total(html: str) -> Optional[int]:
+    """Extrai o total real reportado pelo servidor na linha
+    'Exibindo 1 - 25 de um total de <b>1262</b> jurisprudência(s)'.
+    O <b> quebra o nó de texto, então acha o nó e pega o <b> seguinte.
+    """
+    soup = BeautifulSoup(html, "lxml")
+    node = soup.find(string=re.compile(r"de um total de"))
+    if node is None:
+        return None
+    b = node.find_next("b")
+    if b is None:
+        return None
+    digitos = re.sub(r"\D", "", b.get_text())
+    return int(digitos) if digitos else None
+
+
+def _chave_dedup(r: Resultado):
+    """O servidor às vezes indexa a mesma decisão sob IDs diferentes (mesmo
+    CNJ, mesma publicação, URLs distintas). Dedup por conteúdo; sem CNJ,
+    cai pra URL (não deduplica).
+    """
+    if r.numero_cnj:
+        return (r.numero_cnj, r.publicacao, r.tipo_decisao, r.assunto)
+    return r.url
+
+
+@dataclass
+class Busca:
+    """Resultado de uma busca: itens + metadados do servidor."""
+    resultados: list[Resultado] = field(default_factory=list)
+    total_no_servidor: Optional[int] = None
+    paginas_consultadas: int = 0
+    duplicatas_removidas: int = 0
+
+
 def _parse_decisao(html: str, url: str) -> Decisao:
     soup = BeautifulSoup(html, "lxml")
     d = Decisao(url=url)
@@ -300,7 +397,7 @@ def _parse_decisao(html: str, url: str) -> Decisao:
     if main_card:
         text_just_divs = main_card.find_all("div", class_="text-justify")
         if text_just_divs:
-            d.inteiro_teor = _clean(text_just_divs[0].get_text())
+            d.inteiro_teor = _clean_multiline(_block_text(text_just_divs[0]))
             for tj in text_just_divs[1:]:
                 t = _clean(tj.get_text(" ", strip=True))
                 if t and "TJPI" in t and ")" in t:
@@ -312,6 +409,14 @@ def _parse_decisao(html: str, url: str) -> Decisao:
 
 
 class TJPIClient:
+    # Decisões publicadas não mudam; cache em memória evita re-fetch no fluxo
+    # típico buscar -> ler_decisao(X) -> verificar_citacao(X, trecho).
+    _CACHE_MAX = 32
+
+    # Teto de páginas por busca: limite máx (50) cabe em 2 páginas de 25;
+    # a 3ª cobre perdas por dedup.
+    _MAX_PAGINAS = 3
+
     def __init__(self, timeout: float = 30.0):
         self._client = httpx.AsyncClient(
             base_url=BASE_URL,
@@ -319,21 +424,45 @@ class TJPIClient:
             timeout=timeout,
             follow_redirects=True,
         )
+        self._cache_decisoes: OrderedDict[str, Decisao] = OrderedDict()
 
     async def aclose(self) -> None:
         await self._client.aclose()
 
     async def buscar_jurisprudencia(
         self, query: str, limite: int = 10, page: int = 1,
-    ) -> list[Resultado]:
+    ) -> Busca:
         if not query or not query.strip():
             raise ValueError("query vazia")
-        params = {"q": query.strip()}
-        if page and page > 1:
-            params["page"] = str(page)
-        r = await self._client.get(SEARCH_PATH, params=params)
-        r.raise_for_status()
-        return _parse_resultados(r.text, base_url=BASE_URL, limite=limite)
+        busca = Busca()
+        vistos: set = set()
+        pagina = max(1, page)
+        while (len(busca.resultados) < limite
+               and busca.paginas_consultadas < self._MAX_PAGINAS):
+            params = {"q": query.strip()}
+            if pagina > 1:
+                params["page"] = str(pagina)
+            r = await self._client.get(SEARCH_PATH, params=params)
+            r.raise_for_status()
+            busca.paginas_consultadas += 1
+            if busca.total_no_servidor is None:
+                busca.total_no_servidor = _extract_total(r.text)
+            itens = _parse_resultados(r.text, base_url=BASE_URL)
+            if not itens:
+                break
+            for res in itens:
+                k = _chave_dedup(res)
+                if k in vistos:
+                    busca.duplicatas_removidas += 1
+                    continue
+                vistos.add(k)
+                busca.resultados.append(res)
+                if len(busca.resultados) >= limite:
+                    break
+            if len(itens) < PAGE_SIZE:
+                break  # última página do servidor
+            pagina += 1
+        return busca
 
     async def ler_decisao(self, url_or_id: str) -> Decisao:
         if not url_or_id:
@@ -346,9 +475,16 @@ class TJPIClient:
             url = urljoin(BASE_URL, url_or_id)
         else:
             raise ValueError(f"URL ou ID invalido: {url_or_id}")
+        if url in self._cache_decisoes:
+            self._cache_decisoes.move_to_end(url)
+            return self._cache_decisoes[url]
         r = await self._client.get(url)
         r.raise_for_status()
-        return _parse_decisao(r.text, url)
+        decisao = _parse_decisao(r.text, url)
+        self._cache_decisoes[url] = decisao
+        if len(self._cache_decisoes) > self._CACHE_MAX:
+            self._cache_decisoes.popitem(last=False)
+        return decisao
     
     async def verificar_citacao(self, url_or_id: str, trecho: str) -> dict:
         """Confere se `trecho` aparece literalmente no inteiro_teor da decisao
