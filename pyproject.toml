@@ -1,7 +1,7 @@
 [project]
 name = "jurisprudencia-tjpi-mcp"
 version = "0.1.0"
-description = "Add your description here"
+description = "Servidor MCP para pesquisa de jurisprudência no site oficial do TJ-PI (busca, leitura de decisões e verificação de citações)"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
@@ -9,6 +9,11 @@ dependencies = [
     "httpx>=0.28.1",
     "lxml>=6.1.0",
     "mcp[cli]>=1.27.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
 ]
 
 [project.scripts]
