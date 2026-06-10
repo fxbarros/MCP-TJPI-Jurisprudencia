@@ -1,17 +1,31 @@
 """Servidor MCP para o jurisprudencia.tjpi.jus.br.
 
-Expõe duas tools ao Claude Desktop:
+Expõe três tools ao Claude Desktop:
 - buscar_jurisprudencia: pesquisa por palavra-chave
 - ler_decisao: extrai metadados completos de uma decisão
+- verificar_citacao: confere se um trecho aparece literalmente no inteiro teor
 """
 from __future__ import annotations
 
 import asyncio
 from typing import Optional
 
+import httpx
 from mcp.server.fastmcp import FastMCP
 
 from jurisprudencia_tjpi_mcp.tjpi_client import TJPIClient
+
+
+def _erro_http(e: httpx.HTTPError) -> dict:
+    """Resposta amigável pra falha de rede/HTTP — melhor que traceback cru."""
+    return {
+        "erro": (
+            f"Falha ao consultar o site do TJ-PI ({type(e).__name__}: {e}). "
+            "O site pode estar lento ou fora do ar. Tente novamente em "
+            "instantes; se persistir, avise o usuário em vez de inventar "
+            "resultados."
+        ),
+    }
 
 mcp = FastMCP("jurisprudencia-tjpi")
 
@@ -113,9 +127,9 @@ async def buscar_jurisprudencia(
                  - "construcao em APP" e (nascente ou mata)
                  - sumula e tjpi nao revogada
         limite: número máximo de resultados a retornar (1-50). Default: 10.
-                Se retornar EXATAMENTE `limite` itens, pode haver mais — use `page`
-                ou refine a query.
-        page: página dos resultados (25 por página no servidor). Default: 1.
+                Acima de 25 o cliente busca páginas extras automaticamente.
+        page: página inicial dos resultados (25 por página no servidor).
+              Default: 1.
 
     Returns:
         Dict com:
@@ -123,24 +137,36 @@ async def buscar_jurisprudencia(
           publicacao, ementa [PREVIEW — pode estar truncado], ementa_truncada,
           url). Use `url` em `ler_decisao` antes de citar a decisão.
         - total_retornado: tamanho da lista
+        - total_no_servidor: TOTAL REAL de decisões que a query encontrou no
+          TJ-PI (independe de `limite`). Use ESTE número pra afirmar
+          quantidades ("há N decisões sobre X no TJ-PI").
+        - duplicatas_removidas (opcional): o servidor às vezes indexa a mesma
+          decisão sob IDs diferentes; informa quantas repetições foram tiradas.
         - query_executada, page, limite: ecoa os parâmetros
+        - erro (opcional): falha de rede/HTTP — não invente resultados.
         - _aviso (opcional): instrução de refino quando a busca volta vazia ou
           atinge o limite. PRESTE ATENÇÃO a este campo — ele indica que a query
           provavelmente precisa ser ajustada antes de prosseguir.
     """
     limite = max(1, min(limite, 50))
     client = await _get_client()
-    resultados = await client.buscar_jurisprudencia(
-        query=query, limite=limite, page=page,
-    )
-    itens = [r.to_dict() for r in resultados]
+    try:
+        busca = await client.buscar_jurisprudencia(
+            query=query, limite=limite, page=page,
+        )
+    except httpx.HTTPError as e:
+        return _erro_http(e)
+    itens = [r.to_dict() for r in busca.resultados]
     resposta: dict = {
         "resultados": itens,
         "total_retornado": len(itens),
+        "total_no_servidor": busca.total_no_servidor,
         "query_executada": query,
         "page": page,
         "limite": limite,
     }
+    if busca.duplicatas_removidas:
+        resposta["duplicatas_removidas"] = busca.duplicatas_removidas
     if len(itens) == 0:
         resposta["_aviso"] = (
             "ZERO RESULTADOS. A query provavelmente está restrita demais ou usa "
@@ -152,13 +178,13 @@ async def buscar_jurisprudencia(
             "(3) tirar aspas de frases muito específicas; "
             "(4) checar typo. Só conclua 'sem precedentes' após 2-3 reformulações."
         )
-    elif len(itens) >= limite:
+    elif (busca.total_no_servidor or 0) > len(itens):
         resposta["_aviso"] = (
-            f"LIMITE ATINGIDO ({limite}). Pode haver mais resultados além destes. "
-            "Para ver mais: chame de novo com page=2 (e seguintes), OU refine a "
-            "query com 'e <termo>' / 'nao <termo>' pra reduzir o universo. "
-            "Não afirme totais ('foram encontrados X processos') baseado nesta "
-            "resposta — o número real pode ser maior."
+            f"Mostrando {len(itens)} de {busca.total_no_servidor} resultado(s) "
+            "que existem no servidor pra essa query. Para ver mais: aumente "
+            "`limite`, chame com page seguinte, OU refine a query com "
+            "'e <termo>' / 'nao <termo>' pra reduzir o universo. Ao afirmar "
+            "quantidades, use total_no_servidor, não total_retornado."
         )
     return resposta
 
@@ -193,9 +219,13 @@ async def ler_decisao(url_or_id: str) -> dict:
         - inteiro_teor (texto completo da decisão — fonte para citações)
         - citacao_oficial (string já formatada pelo próprio site)
         - citacao_abnt (montada por nós: "(TJ-PI - Classe: CNJ, Relator: X, ...)")
+        - erro (opcional): falha de rede/HTTP — não invente conteúdo.
     """
     client = await _get_client()
-    d = await client.ler_decisao(url_or_id)
+    try:
+        d = await client.ler_decisao(url_or_id)
+    except httpx.HTTPError as e:
+        return _erro_http(e)
     out = d.to_dict()
     out["citacao_abnt"] = d.citacao_abnt()
     return out
@@ -229,9 +259,14 @@ async def verificar_citacao(url_or_id: str, trecho: str) -> dict:
         - valido (bool): True se o trecho foi encontrado no inteiro_teor.
         - motivo (str): explicação textual do resultado.
         - url (str | None): URL canônica da decisão verificada.
+        - erro (opcional): falha de rede/HTTP — nesse caso NÃO conclua nada
+          sobre a validade do trecho.
     """
     client = await _get_client()
-    return await client.verificar_citacao(url_or_id, trecho)
+    try:
+        return await client.verificar_citacao(url_or_id, trecho)
+    except httpx.HTTPError as e:
+        return _erro_http(e)
 
 
 def main() -> None:
