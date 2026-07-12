@@ -113,4 +113,4 @@ uv run pytest
 
 [MIT](LICENSE). Construído por [Fábio Ximenes Barros](https://github.com/fxbarros). Sem afiliação com o TJ-PI — usa apenas o portal público de jurisprudência.
 
-<p align="center"><sub>Arte do banner: original, criada para o projeto.</sub></p>
+<p align="center"><sub>Arte do banner: original — marca dos projetos MCP do autor.</sub></p>
