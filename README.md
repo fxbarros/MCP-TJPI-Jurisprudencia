@@ -1,5 +1,5 @@
 <h1 align="center">
-    <img alt="MCP TJPI-Jurisprudência" src="https://raw.githubusercontent.com/fxbarros/MCP-TJPI-Jurisprudencia/main/docs/assets/banner.svg?sanitize=true">
+    <img alt="MCP TJPI-Jurisprudência" src="https://raw.githubusercontent.com/fxbarros/MCP-TJPI-Jurisprudencia/main/docs/assets/banner.svg?sanitize=true&v=marca">
     <br>
     <small>Pesquise acórdãos em linguagem natural. Cite com verificação literal.</small>
 </h1>
