@@ -1,47 +1,70 @@
-# jurisprudencia-tjpi-mcp
+<h1 align="center">
+    <img alt="MCP TJPI-Jurisprudência" src="https://raw.githubusercontent.com/fxbarros/MCP-TJPI-Jurisprudencia/main/docs/assets/banner.svg?sanitize=true">
+    <br>
+    <small>Pesquise acórdãos em linguagem natural. Cite com verificação literal.</small>
+</h1>
 
-Servidor MCP (Model Context Protocol) que expõe a [jurisprudência oficial do Tribunal de Justiça do Piauí](https://jurisprudencia.tjpi.jus.br/) ao Claude Desktop, permitindo pesquisar acórdãos em linguagem natural e gerar citações ABNT prontas para colar em peças processuais.
+<p align="center">
+    <img alt="Python" src="https://img.shields.io/badge/python-3.12+-3776AB?logo=python&logoColor=white">
+    <img alt="Testes" src="https://img.shields.io/badge/testes-10%20%E2%9C%93%20offline-brightgreen">
+    <img alt="MCP" src="https://img.shields.io/badge/MCP-Claude%20Desktop-d97757">
+    <img alt="Sem login" src="https://img.shields.io/badge/TJ--PI-sem%20login%20%C2%B7%20sem%20headless-8b0000">
+    <img alt="Licença" src="https://img.shields.io/badge/licen%C3%A7a-MIT-blue">
+</p>
 
-## O que faz
+<p align="center">
+    <a href="#-o-que-faz"><strong>O que faz</strong></a>
+    &middot;
+    <a href="#%EF%B8%8F-as-3-ferramentas"><strong>Ferramentas</strong></a>
+    &middot;
+    <a href="#-anti-alucina%C3%A7%C3%A3o"><strong>Anti-alucinação</strong></a>
+    &middot;
+    <a href="#-instala%C3%A7%C3%A3o"><strong>Instalação</strong></a>
+    &middot;
+    <a href="#-testes"><strong>Testes</strong></a>
+    &middot;
+    <a href="#-limita%C3%A7%C3%B5es-conhecidas"><strong>Limitações</strong></a>
+</p>
+
+Servidor [MCP](https://modelcontextprotocol.io) que expõe a [jurisprudência oficial do Tribunal de Justiça do Piauí](https://jurisprudencia.tjpi.jus.br/) ao Claude Desktop: pesquisa de acórdãos em linguagem natural, leitura do inteiro teor e **citação ABNT pronta para colar na peça** — com verificação literal de cada trecho citado.
+
+Sem login, sem Cloudflare, sem browser headless: o portal do TJ-PI é um site Rails público server-rendered, então `httpx + BeautifulSoup` bastam. Rápido, leve e sem fricção.
+
+## ⚖️ O que faz
 
 ```
 Você:    Busque 5 jurisprudências do TJ-PI sobre auto de infração ambiental em APP.
-Claude:  [chama buscar_jurisprudencia] → 5 resultados com CNJ, ementa e URL.
+Claude:  [buscar_jurisprudencia] → 5 resultados com nº CNJ, ementa e URL.
 
 Você:    A do desembargador Sebastião sobre competência supletiva é a melhor. Cita ABNT?
-Claude:  [chama ler_decisao] →
+Claude:  [ler_decisao] →
          (TJ-PI - AGRAVO INTERNO CÍVEL: 0757817-66.2024.8.18.0000,
           Relator: SEBASTIAO RIBEIRO MARTINS,
           5ª Câmara de Direito Público,
           Data de Publicação: 05/02/2025)
+
+Você:    Confere se esse trecho está mesmo no acórdão antes de eu citar.
+Claude:  [verificar_citacao] → valido: True ✓
 ```
 
-## Tools expostas
+## 🛠️ As 3 ferramentas
 
-### `buscar_jurisprudencia(query, limite=10, page=1)`
+| Ferramenta | O que faz |
+|---|---|
+| `buscar_jurisprudencia(query, limite, page)` | pesquisa com os [conectivos do site](https://jurisprudencia.tjpi.jus.br/jurisprudences/conectives) em português — `e`, `ou` (entre parênteses), `nao`, `"frase exata"`. Devolve título, nº CNJ formatado, tipo, assunto, publicação, preview da ementa, URL e o **total real** de resultados no servidor |
+| `ler_decisao(url_or_id)` | metadados formais completos (relator, órgão colegiado, competência, partes...), ementa limpa, `inteiro_teor`, citação oficial do site e `citacao_abnt` montada. Aceita URL completa, caminho ou só o ID |
+| `verificar_citacao(url_or_id, trecho)` | confere se o trecho aparece **literalmente** no inteiro teor — tolerante a acentos/caixa/espaços, implacável com paráfrase, omissão ou inversão de palavras |
 
-Pesquisa por palavra-chave. Suporta os mesmos [conectivos do site](https://jurisprudencia.tjpi.jus.br/jurisprudences/conectives) (`E`, `OU`, `NÃO`, `"frase exata"`).
+## 🛡️ Anti-alucinação
 
-Retorna lista de dicts com `titulo`, `numero_cnj` (já formatado), `tipo_decisao`, `assunto`, `publicacao`, `ementa` (preview) e `url`.
+Este servidor foi desenhado para uso forense real, onde citação inventada custa caro:
 
-### `ler_decisao(url_or_id)`
+- **Ementas no formato CNJ**: o parser acompanha o padrão da Recomendação CNJ 154/2024 (sem rótulo "Ementa:"), adotado pelo TJ-PI desde 2025.
+- **Dedup**: o portal do TJ-PI devolve a mesma decisão sob IDs diferentes — o servidor deduplica e ainda expõe o `total_no_servidor` para você saber o universo real.
+- **Preview ≠ fonte**: a ementa da listagem pode vir truncada; a docstring instrui o modelo a sempre chamar `ler_decisao` antes de citar.
+- **`verificar_citacao` como portão final**: citação direta entre aspas só entra na peça se conferir literalmente no `inteiro_teor`.
 
-Lê uma decisão individual e extrai todos os metadados formais.
-
-Aceita URL completa, caminho relativo (`/jurisprudences/N/public`) ou apenas o ID numérico (`N`).
-
-Retorna `numero_cnj`, `classe_judicial`, `tipo_decisao`, `relator`, `orgao_julgador`, `orgao_julgador_colegiado`, `competencia`, `autor`, `reu`, `publicacao`, `assunto_principal`, `ementa` (texto limpo), `inteiro_teor`, `citacao_oficial` (literal do site) e `citacao_abnt` (montada no formato `(TJ-PI - Classe: CNJ, Relator: X, Câmara, Data Pub. DD/MM/AAAA)`).
-
-## Stack
-
-- Python 3.12+ com [uv](https://docs.astral.sh/uv/)
-- [httpx](https://www.python-httpx.org/) (HTTP async)
-- [BeautifulSoup4 + lxml](https://www.crummy.com/software/BeautifulSoup/)
-- [mcp[cli]](https://github.com/modelcontextprotocol/python-sdk) (FastMCP)
-
-Sem login, sem Cloudflare, sem browser headless. O TJ-PI é um site Rails público server-rendered, então `httpx + bs4` basta.
-
-## Instalação
+## 📦 Instalação
 
 ```bash
 git clone https://github.com/fxbarros/MCP-TJPI-Jurisprudencia.git jurisprudencia-tjpi-mcp
@@ -49,9 +72,7 @@ cd jurisprudencia-tjpi-mcp
 uv sync
 ```
 
-## Configuração no Claude Desktop
-
-Abra `~/Library/Application Support/Claude/claude_desktop_config.json` e adicione o servidor (preservando outros que já existirem):
+Registro no Claude Desktop — `~/Library/Application Support/Claude/claude_desktop_config.json` (preservando outros servidores que já existirem):
 
 ```json
 {
@@ -69,50 +90,27 @@ Abra `~/Library/Application Support/Claude/claude_desktop_config.json` e adicion
 }
 ```
 
-> ⚠️ **Substitua `SEU_USUARIO_MAC` pelo nome do seu usuário no macOS** (descubra rodando `whoami` no Terminal). Esse placeholder é da máquina de quem está instalando, não tem nada a ver com seu username do GitHub.
+> ⚠️ **Substitua `SEU_USUARIO_MAC` pelo nome do seu usuário no macOS** (descubra com `whoami` no Terminal) — o placeholder é da máquina de quem instala, não do GitHub.
 >
-> ⚠️ Use também o caminho **absoluto** do `uv` (confirme com `which uv` — pode ser `/opt/homebrew/bin/uv` em vez de `/Users/.../.local/bin/uv` dependendo da instalação). O Claude Desktop não herda o `$PATH` do shell.
+> ⚠️ Use o caminho **absoluto** do `uv` (confirme com `which uv` — pode ser `/opt/homebrew/bin/uv`). O Claude Desktop não herda o `$PATH` do shell.
 
-Reinicie o Claude Desktop (Cmd+Q e abra novamente). Em uma conversa nova, peça por exemplo: _"Busque jurisprudência do TJ-PI sobre dano moral por negativação indevida"_.
+Reinicie o Claude Desktop (Cmd+Q e abra de novo) e peça: *"Busque jurisprudência do TJ-PI sobre dano moral por negativação indevida"*.
 
-## Testes offline
-
-Há fixtures HTML em `tests/fixtures/` para testar o parser sem rede:
+## ✅ Testes
 
 ```bash
-uv run python tests/test_parser.py
+uv run pytest
 ```
 
-Para diagnóstico verboso:
+10 testes, 100% offline: o parser é exercitado contra fixtures de HTML **real** do TJ-PI em `tests/fixtures/` — nenhuma requisição de rede. Diagnóstico verboso com `TJPI_DEBUG=1`.
 
-```bash
-TJPI_DEBUG=1 uv run python tests/test_parser.py
-```
+## 🔍 Limitações conhecidas
 
-## Estrutura
+- **Preview da listagem trunca a ementa** em algumas decisões (o servidor do TJ-PI corta antes de o texto começar). Quando ocorre, devolvemos o cabeçalho do acórdão como fallback — a ementa real vem via `ler_decisao`.
+- **Filtros avançados não implementados**: hoje só `q` e `page`; classe, relator e data ficam para o futuro (PR welcome).
 
-```
-jurisprudencia-tjpi-mcp/
-├── src/
-│   └── jurisprudencia_tjpi_mcp/
-│       ├── __init__.py
-│       ├── tjpi_client.py     # cliente HTTP + parser bs4
-│       └── server.py          # FastMCP entry point
-├── tests/
-│   ├── fixtures/              # HTML real do TJ-PI para teste offline
-│   └── test_parser.py
-└── pyproject.toml
-```
+## ⚖️ Licença e autoria
 
-## Limitações conhecidas
+[MIT](LICENSE). Construído por [Fábio Ximenes Barros](https://github.com/fxbarros). Sem afiliação com o TJ-PI — usa apenas o portal público de jurisprudência.
 
-- **Preview da listagem trunca a ementa** em algumas decisões — o servidor corta o preview antes de "Ementa:" aparecer. Quando isso ocorre, devolvemos o cabeçalho do acórdão como fallback. Para a ementa real, chame `ler_decisao(url)`.
-- **Filtros avançados não implementados**: hoje só `q` e `page`. Filtros por classe, tipo, relator e data ainda pendentes (PR welcome).
-
-## Licença
-
-MIT — veja [LICENSE](LICENSE).
-
-## Autoria
-
-Construído por [Fábio Ximenes Barros](https://github.com/fxbarros). Não tem afiliação com o TJ-PI; usa apenas o portal público de jurisprudência.
+<p align="center"><sub>Arte do banner: original, criada para o projeto.</sub></p>

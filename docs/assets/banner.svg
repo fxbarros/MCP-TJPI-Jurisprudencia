@@ -1,0 +1,82 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 360" role="img" aria-label="MCP TJPI-Jurisprudência">
+  <!-- Arte original (sumi-ê): a balança da Justiça ao entardecer.
+       Criada para este projeto — livre de direitos de terceiros. -->
+  <defs>
+    <linearGradient id="ceu" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#191014"/>
+      <stop offset="0.62" stop-color="#3a1c1a"/>
+      <stop offset="1" stop-color="#241114"/>
+    </linearGradient>
+    <radialGradient id="sol" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#e04a33"/>
+      <stop offset="0.75" stop-color="#c22e26"/>
+      <stop offset="1" stop-color="#a91f22"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="1280" height="360" fill="url(#ceu)"/>
+
+  <!-- sol poente -->
+  <circle cx="1000" cy="190" r="126" fill="url(#sol)"/>
+
+  <!-- serra ao fundo -->
+  <path d="M660,268 L760,222 L830,252 L920,210 L1010,254 L1110,224 L1200,258 L1280,240 L1280,360 L660,360 Z"
+        fill="#1c0f12" opacity="0.85"/>
+
+  <!-- pássaros -->
+  <g stroke="#120a0c" stroke-width="3" stroke-linecap="round" fill="none" opacity="0.9">
+    <path d="M742,92 q7,-8 14,0 q7,-8 14,0"/>
+    <path d="M804,72 q6,-7 12,0 q6,-7 12,0"/>
+    <path d="M690,116 q5,-6 10,0 q5,-6 10,0"/>
+  </g>
+
+  <!-- fórum na colina (frontão e colunas) -->
+  <g fill="#120a0c">
+    <path d="M1150,242 L1226,242 L1188,214 Z"/>
+    <rect x="1154" y="246" width="9" height="34"/>
+    <rect x="1172" y="246" width="9" height="34"/>
+    <rect x="1190" y="246" width="9" height="34"/>
+    <rect x="1208" y="246" width="9" height="34"/>
+    <rect x="1148" y="280" width="80" height="7"/>
+  </g>
+
+  <!-- campo -->
+  <path d="M0,300 Q160,282 340,296 Q560,312 780,296 Q1040,282 1280,302 L1280,360 L0,360 Z" fill="#0d0709"/>
+
+  <!-- a balança da Justiça (silhueta) -->
+  <g stroke="#0a0507" stroke-width="7" stroke-linecap="round" fill="none">
+    <line x1="985" y1="118" x2="985" y2="306"/>
+    <line x1="905" y1="140" x2="1065" y2="140"/>
+  </g>
+  <circle cx="985" cy="110" r="9" fill="#0a0507"/>
+  <!-- travessão: correntes e pratos -->
+  <g stroke="#0a0507" stroke-width="3" fill="none">
+    <line x1="905" y1="140" x2="885" y2="206"/>
+    <line x1="905" y1="140" x2="925" y2="206"/>
+    <line x1="1065" y1="140" x2="1045" y2="218"/>
+    <line x1="1065" y1="140" x2="1085" y2="218"/>
+  </g>
+  <path d="M876,206 L934,206 Q930,232 905,232 Q880,232 876,206 Z" fill="#0a0507"/>
+  <path d="M1036,218 L1094,218 Q1090,244 1065,244 Q1040,244 1036,218 Z" fill="#0a0507"/>
+  <!-- base -->
+  <path d="M955,306 L1015,306 L1023,322 L947,322 Z" fill="#0a0507"/>
+
+  <!-- capim -->
+  <g stroke="#0a0507" stroke-width="3" stroke-linecap="round" fill="none">
+    <path d="M60,332 q4,-26 -8,-40"/>
+    <path d="M78,334 q2,-22 10,-34"/>
+    <path d="M250,330 q6,-24 -4,-38"/>
+    <path d="M470,334 q4,-22 -6,-34"/>
+    <path d="M640,330 q6,-24 -2,-36"/>
+    <path d="M658,332 q2,-18 12,-28"/>
+    <path d="M1150,336 q4,-20 -6,-32"/>
+  </g>
+
+  <!-- título -->
+  <g font-family="Iowan Old Style, Palatino, Georgia, serif">
+    <text x="72" y="150" font-size="60" font-weight="700" fill="#f3ead9" letter-spacing="1">MCP TJPI‑Jurisprudência</text>
+    <text x="74" y="192" font-size="23" fill="#d8b48e">Jurisprudência oficial do TJ‑PI no Claude — citação ABNT pronta para a peça</text>
+    <text x="74" y="224" font-size="17" fill="#9c7f68">buscar → ler → verificar citação · sem login · sem headless · httpx + BeautifulSoup</text>
+  </g>
+  <rect x="74" y="240" width="340" height="3" fill="#a91f22"/>
+</svg>
